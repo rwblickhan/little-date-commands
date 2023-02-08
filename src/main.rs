@@ -1,32 +1,56 @@
 use chrono::prelude::*;
-use std::{error::Error, fmt::Display};
+use clap::Parser;
 
-#[derive(Debug)]
-struct MissingDateError {}
+#[derive(clap::Subcommand)]
+enum Command {
+    Ago {
+        input_date: String,
+    },
+    Til {
+        input_date: String,
+    },
+    Between {
+        input_date1: String,
+        input_date2: String,
+    },
+}
 
-impl Error for MissingDateError {}
+#[derive(clap::Parser)]
+struct Args {
+    #[command(subcommand)]
+    command: Command,
+}
 
-impl Display for MissingDateError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Missing date input")
-    }
+fn parse(input_str: &str) -> anyhow::Result<NaiveDate> {
+    Ok(NaiveDate::parse_from_str(&input_str, "%m-%d-%Y")
+        .or(NaiveDate::parse_from_str(&input_str, "%m/%d/%Y"))?)
 }
 
 fn main() -> anyhow::Result<()> {
-    let mut args = std::env::args();
-    let name = args.next().unwrap();
-    let input_date = args.next().ok_or(MissingDateError {})?;
+    let args = Args::parse();
 
-    let then = NaiveDate::parse_from_str(&input_date, "%m-%d-%Y")
-        .or(NaiveDate::parse_from_str(&input_date, "%m/%d/%Y"))?;
-    let now = Utc::now().date_naive();
-
-    let ago = now - then;
-
-    if name.contains("til") {
-        println!("{}", -ago.num_days());
-    } else {
-        println!("{}", ago.num_days());
+    match args.command {
+        Command::Ago { input_date } => {
+            let then = parse(&input_date)?;
+            let now = Local::now().date_naive();
+            let ago = now - then;
+            println!("{}", ago.num_days());
+        }
+        Command::Til { input_date } => {
+            let then = parse(&input_date)?;
+            let now = Local::now().date_naive();
+            let til = then - now;
+            println!("{}", til.num_days());
+        }
+        Command::Between {
+            input_date1,
+            input_date2,
+        } => {
+            let date1 = parse(&input_date1)?;
+            let date2 = parse(&input_date2)?;
+            let between = date2 - date1;
+            println!("{}", between.num_days());
+        }
     }
 
     anyhow::Ok(())
